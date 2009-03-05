@@ -1,7 +1,10 @@
 #include <stdio.h>
+#include <string.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <unbound.h>
+
+#define QNAME_MAX 255
 
 /* This is called when resolution is completed */
 void mycallback(void* mydata, int err, struct ub_result* result)
@@ -26,6 +29,8 @@ int main(void)
 	volatile int qlen = 0;
 	int retval;
 	int i = 0;
+	char qname[QNAME_MAX];
+	char *nl;
 
 	/* create context */
 	ctx = ub_ctx_create();
@@ -34,23 +39,23 @@ int main(void)
 		return 1;
 	}
 
-	/* asynchronous query for webserver */
-	retval = ub_resolve_async(ctx, "www.nlnetlabs.nl", 1, 1, (void*)&qlen, mycallback, NULL);
-	if(retval != 0) {
-		printf("resolve error: %s\n", ub_strerror(retval));
-		return 1;
-	}
-	qlen++;
-	retval = ub_resolve_async(ctx, "www.slashdot.org", 1, 1, (void*)&qlen, mycallback, NULL);
-	if(retval != 0) {
-		printf("resolve error: %s\n", ub_strerror(retval));
-		return 1;
-	}
-	qlen++;
-	//retval = ub_resolve_async(ctx, "www.nlnetlabs.nl", 1, 1, (void*)&qlen, mycallback, NULL);
-
 	/* we keep running, lets do something while waiting */
-	while(qlen) {
+	do {
+		/* read and prepare qname */
+		if(fgets(qname, QNAME_MAX, stdin) != NULL) {
+			nl = strrchr(qname, '\n');
+			if(nl) *nl = '\0';
+			printf("debug: ok, just read \"%s\" from stdin\n", qname);
+
+			/* add async query to queue */
+			retval = ub_resolve_async(ctx, qname, 1, 1, (void*)&qlen, mycallback, NULL);
+			if(retval != 0) {
+				printf("resolve error: %s\n", ub_strerror(retval));
+				return 1;
+			}
+			qlen++;
+		}
+
 		usleep(100000); /* wait 1/10 of a second */
 		printf("time passed (%d) .. qlen is %d\n", i++, qlen);
 		retval = ub_process(ctx);
@@ -58,7 +63,7 @@ int main(void)
 			printf("resolve error: %s\n", ub_strerror(retval));
 			return 1;
 		}
-	}
+	} while(qlen);
 	printf("done\n");
 
 	ub_ctx_delete(ctx);
