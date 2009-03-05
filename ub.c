@@ -6,8 +6,8 @@
 /* This is called when resolution is completed */
 void mycallback(void* mydata, int err, struct ub_result* result)
 {	
-	int* done = (int*)mydata;
-	*done = 1;
+	int* qlen = (int*)mydata;
+	(*qlen)--;
 	if(err != 0) {
 		printf("resolve error: %s\n", ub_strerror(err));
 		return;
@@ -23,7 +23,7 @@ void mycallback(void* mydata, int err, struct ub_result* result)
 int main(void)
 {
 	struct ub_ctx* ctx;
-	volatile int done = 0;
+	volatile int qlen = 0;
 	int retval;
 	int i = 0;
 
@@ -35,19 +35,24 @@ int main(void)
 	}
 
 	/* asynchronous query for webserver */
-	retval = ub_resolve_async(ctx, "www.nlnetlabs.nl", 
-		1 /* TYPE A (IPv4 address) */, 
-		1 /* CLASS IN (internet) */, 
-		(void*)&done, mycallback, NULL);
+	retval = ub_resolve_async(ctx, "www.nlnetlabs.nl", 1, 1, (void*)&qlen, mycallback, NULL);
 	if(retval != 0) {
 		printf("resolve error: %s\n", ub_strerror(retval));
 		return 1;
 	}
+	qlen++;
+	retval = ub_resolve_async(ctx, "www.slashdot.org", 1, 1, (void*)&qlen, mycallback, NULL);
+	if(retval != 0) {
+		printf("resolve error: %s\n", ub_strerror(retval));
+		return 1;
+	}
+	qlen++;
+	//retval = ub_resolve_async(ctx, "www.nlnetlabs.nl", 1, 1, (void*)&qlen, mycallback, NULL);
 
 	/* we keep running, lets do something while waiting */
-	while(!done) {
+	while(qlen) {
 		usleep(100000); /* wait 1/10 of a second */
-		printf("time passed (%d) ..\n", i++);
+		printf("time passed (%d) .. qlen is %d\n", i++, qlen);
 		retval = ub_process(ctx);
 		if(retval != 0) {
 			printf("resolve error: %s\n", ub_strerror(retval));
