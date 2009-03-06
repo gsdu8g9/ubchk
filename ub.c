@@ -5,21 +5,25 @@
 #include <unbound.h>
 
 #define QNAME_MAX 255
-#define QUEUE_MAX 10
+#define QUEUE_MAX 100
 
 /* This is called when resolution is completed */
 void mycallback(void* mydata, int err, struct ub_result* result)
 {
 	int* qlen = (int*)mydata;
 	(*qlen)--;
-	if(err != 0) {
-		printf("resolve error: %s\n", ub_strerror(err));
-		return;
-	}
-	/* show first result */
-	if(result->havedata)
-		printf("The address of %s is %s\n", result->qname, 
-			inet_ntoa(*(struct in_addr*)result->data[0]));
+
+	if(err ||
+	   result->rcode ||
+	   !result->havedata ||
+	   result->nxdomain)
+		printf("%s;%d;%d;%d;%d\n",
+				result->qname,
+				err,
+				result->rcode,
+				result->havedata,
+				result->nxdomain);
+	fflush(NULL);
 
 	ub_resolve_free(result);
 }
@@ -45,6 +49,8 @@ int main(void)
 		return 1;
 	}
 
+	fprintf(stderr, "HOST;ERR;RCODE;DATA;NXDOMAIN\n");
+
 	/* we keep running, lets do something while waiting */
 	moredata = (char*)-1;
 	do {
@@ -55,15 +61,24 @@ int main(void)
 			if(moredata != NULL) {
 				nl = strrchr(qname, '\n');
 				if(nl) *nl = '\0';
+				if((int)nl == (int)&qname)
+				{
+					printf("empty input\n");
+					continue;
+				}
 
 				/* add async query to queue */
-				retval = ub_resolve_async(ctx, qname, 1, 1, (void*)&qlen, mycallback, NULL);
+				retval = ub_resolve_async(ctx, qname,
+						1,
+						1,
+						(void*)&qlen, mycallback, NULL);
 				if(retval != 0) {
 					printf("resolve error for %s: %s\n", qname, ub_strerror(retval));
 					continue;
 				}
 				qlen++;
 			}
+			usleep(50000); /* wait 1/50 of a second */
 		} else {
 			/* queue is full || eof stdin reached */
 			usleep(100000); /* wait 1/10 of a second */
