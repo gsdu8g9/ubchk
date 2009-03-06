@@ -1,3 +1,27 @@
+/*
+ * DNS lookup checker based on libunbound. Heavily based on the
+ * example found at http://www.unbound.net/documentation/example_4.c
+ *
+ * Reads a list of hostnames from stdin, separated by newlines. Puts
+ * these into a queue and resolves them in parallel. The original
+ * usecase was to run through a list of hostnames to determine which
+ * would fail. Repeat at several locations to compare results and
+ * determine potential DNS blocks.
+ *
+ * Usage:
+ *
+ *   ./ubchk < hostlist > result.csv
+ *
+ * The original example_4.c has no explicit license.
+ *
+ * svensven@gmail.com 2009-03-06
+ *
+ * TODO:
+ * + Use getopt for QUEUE_MAX and in/out files.
+ * + Determine where in the chain things fail (e.g. TLD NS fail).
+ *
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <arpa/inet.h>
@@ -5,7 +29,7 @@
 #include <unbound.h>
 
 #define QNAME_MAX 255
-#define QUEUE_MAX 100
+#define QUEUE_MAX 100 /* FIXME: use getopt instead */
 
 /* This is called when resolution is completed */
 void mycallback(void* mydata, int err, struct ub_result* result)
