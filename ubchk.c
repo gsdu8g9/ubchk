@@ -19,6 +19,9 @@
  * TODO:
  * + Use getopt for QUEUE_MAX and in/out files.
  * + Determine where in the chain things fail (e.g. TLD NS fail).
+ * + Allow comments in input.
+ * + Remove carriage returns from input.
+ * + Arbitrary output format.
  *
  */
 
